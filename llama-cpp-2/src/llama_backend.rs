@@ -1,26 +1,27 @@
 //! Representation of an initialized llama backend
 
-use crate::LLamaCppError;
 use llama_cpp_sys_2::ggml_log_level;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::SeqCst;
+use std::sync::Once;
 
 /// Representation of an initialized llama backend
 /// This is required as a parameter for most llama functions as the backend must be initialized
 /// before any llama functions are called. This type is proof of initialization.
 #[derive(Eq, PartialEq, Debug)]
-pub struct LlamaBackend {}
+pub struct LlamaBackend;
 
 static LLAMA_BACKEND_INITIALIZED: AtomicBool = AtomicBool::new(false);
+static START: Once = Once::new();
 
 impl LlamaBackend {
     /// Mark the llama backend as initialized
-    fn mark_init() -> crate::Result<()> {
-        match LLAMA_BACKEND_INITIALIZED.compare_exchange(false, true, SeqCst, SeqCst) {
-            Ok(_) => Ok(()),
-            Err(_) => Err(LLamaCppError::BackendAlreadyInitialized),
-        }
-    }
+    // fn mark_init() -> crate::Result<()> {
+    //     match LLAMA_BACKEND_INITIALIZED.compare_exchange(false, true, SeqCst, SeqCst) {
+    //         Ok(_) => Ok(()),
+    //         Err(_) => Err(LLamaCppError::BackendAlreadyInitialized),
+    //     }
+    // }
 
     /// Initialize the llama backend (without numa).
     ///
@@ -42,10 +43,11 @@ impl LlamaBackend {
     ///# }
     /// ```
     #[tracing::instrument(skip_all)]
-    pub fn init() -> crate::Result<LlamaBackend> {
-        Self::mark_init()?;
-        unsafe { llama_cpp_sys_2::llama_backend_init() }
-        Ok(LlamaBackend {})
+    pub fn init() {
+        START.call_once(|| {
+            LLAMA_BACKEND_INITIALIZED.store(true, SeqCst);
+            unsafe { llama_cpp_sys_2::llama_backend_init() }
+        });
     }
 
     /// Initialize the llama backend (with numa).
@@ -62,16 +64,25 @@ impl LlamaBackend {
     ///# }
     /// ```
     #[tracing::instrument(skip_all)]
-    pub fn init_numa(strategy: NumaStrategy) -> crate::Result<LlamaBackend> {
-        Self::mark_init()?;
-        unsafe {
-            llama_cpp_sys_2::llama_numa_init(llama_cpp_sys_2::ggml_numa_strategy::from(strategy));
+    pub fn init_numa(strategy: NumaStrategy) {
+        START.call_once(|| unsafe {
+            LLAMA_BACKEND_INITIALIZED.store(true, SeqCst);
+            llama_cpp_sys_2::llama_numa_init(llama_cpp_sys_2::ggml_numa_strategy::from(strategy))
+        });
+    }
+    /// deinit
+    #[tracing::instrument(skip_all)]
+    pub fn deinit() {
+        if LLAMA_BACKEND_INITIALIZED
+            .compare_exchange(true, false, SeqCst, SeqCst)
+            .is_ok()
+        {
+            unsafe { llama_cpp_sys_2::llama_backend_free() }
         }
-        Ok(LlamaBackend {})
     }
 
     /// Change the output of llama.cpp's logging to be voided instead of pushed to `stderr`.
-    pub fn void_logs(&mut self) {
+    pub fn void_logs() {
         unsafe extern "C" fn void_log(
             _level: ggml_log_level,
             _text: *const ::std::os::raw::c_char,
@@ -153,17 +164,17 @@ impl From<NumaStrategy> for llama_cpp_sys_2::ggml_numa_strategy {
 ///# }
 ///
 /// ```
-impl Drop for LlamaBackend {
-    fn drop(&mut self) {
-        match LLAMA_BACKEND_INITIALIZED.compare_exchange(true, false, SeqCst, SeqCst) {
-            Ok(_) => {}
-            Err(_) => {
-                unreachable!("This should not be reachable as the only ways to obtain a llama backend involve marking the backend as initialized.")
-            }
-        }
-        unsafe { llama_cpp_sys_2::llama_backend_free() }
-    }
-}
+// impl Drop for LlamaBackend {
+//     fn drop(&mut self) {
+//         match LLAMA_BACKEND_INITIALIZED.compare_exchange(true, false, SeqCst, SeqCst) {
+//             Ok(_) => {}
+//             Err(_) => {
+//                 unreachable!("This should not be reachable as the only ways to obtain a llama backend involve marking the backend as initialized.")
+//             }
+//         }
+//         unsafe { llama_cpp_sys_2::llama_backend_free() }
+//     }
+// }
 
 #[cfg(test)]
 mod tests {

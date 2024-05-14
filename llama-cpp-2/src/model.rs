@@ -461,7 +461,7 @@ impl LlamaModel {
     /// See [`LlamaModelLoadError`] for more information.
     #[tracing::instrument(skip_all, fields(params))]
     pub fn load_from_file(
-        _: &LlamaBackend,
+        // _: &LlamaBackend,
         path: impl AsRef<Path>,
         params: &LlamaModelParams,
     ) -> Result<Self, LlamaModelLoadError> {
@@ -470,7 +470,6 @@ impl LlamaModel {
         let path = path
             .to_str()
             .ok_or(LlamaModelLoadError::PathToStrError(path.to_path_buf()))?;
-
         let cstr = CString::new(path)?;
         let llama_model =
             unsafe { llama_cpp_sys_2::llama_load_model_from_file(cstr.as_ptr(), params.params) };
@@ -490,7 +489,7 @@ impl LlamaModel {
     #[allow(clippy::needless_pass_by_value)]
     pub fn new_context(
         &self,
-        _: &LlamaBackend,
+        // _: &LlamaBackend,
         params: LlamaContextParams,
     ) -> Result<LlamaContext, LlamaContextLoadError> {
         let context_params = params.context_params;
