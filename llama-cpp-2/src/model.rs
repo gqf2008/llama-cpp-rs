@@ -1,5 +1,5 @@
 //! A safe wrapper around `llama_model`.
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 use std::os::raw::c_int;
 use std::path::Path;
 use std::ptr::NonNull;
@@ -65,6 +65,10 @@ unsafe impl Send for LlamaModel {}
 unsafe impl Sync for LlamaModel {}
 
 impl LlamaModel {
+    /// raw ptr
+    pub fn as_raw_ptr(&self) -> *const llama_cpp_sys_2::llama_model {
+        self.model.as_ptr()
+    }
     /// get the number of tokens the model was trained on
     ///
     /// # Panics
@@ -107,13 +111,76 @@ impl LlamaModel {
         let token = unsafe { llama_cpp_sys_2::llama_token_nl(self.model.as_ptr()) };
         LlamaToken(token)
     }
+    /// Get the cls token.
+    #[must_use]
+    pub fn token_cls(&self) -> LlamaToken {
+        let token = unsafe { llama_cpp_sys_2::llama_token_cls(self.model.as_ptr()) };
+        LlamaToken(token)
+    }
+
+    /// Get the sep token.
+    #[must_use]
+    pub fn token_sep(&self) -> LlamaToken {
+        let token = unsafe { llama_cpp_sys_2::llama_token_sep(self.model.as_ptr()) };
+        LlamaToken(token)
+    }
+
+    /// Codellama infill tokens
+    #[must_use]
+    pub fn token_prefix(&self) -> LlamaToken {
+        let token = unsafe { llama_cpp_sys_2::llama_token_prefix(self.model.as_ptr()) };
+        LlamaToken(token)
+    }
+
+    ///Vocab
+    pub fn token_get_text(&self, token: LlamaToken) -> String {
+        unsafe {
+            let char_ptr = llama_cpp_sys_2::llama_token_get_text(self.model.as_ptr(), token.0);
+            CStr::from_ptr(char_ptr).to_string_lossy().to_string()
+        }
+    }
+
+    ///Vocab
+    pub fn token_get_score(&self, token: LlamaToken) -> f32 {
+        unsafe { llama_cpp_sys_2::llama_token_get_score(self.model.as_ptr(), token.0) }
+    }
+
+    ///Vocab
+    pub fn token_is_eog(&self, token: LlamaToken) -> bool {
+        unsafe { llama_cpp_sys_2::llama_token_is_eog(self.model.as_ptr(), token.0) }
+    }
+
+    /// Codellama infill tokens
+    #[must_use]
+    pub fn token_middle(&self) -> LlamaToken {
+        let token = unsafe { llama_cpp_sys_2::llama_token_middle(self.model.as_ptr()) };
+        LlamaToken(token)
+    }
+
+    /// Codellama infill tokens
+    #[must_use]
+    pub fn token_suffix(&self) -> LlamaToken {
+        let token = unsafe { llama_cpp_sys_2::llama_token_suffix(self.model.as_ptr()) };
+        LlamaToken(token)
+    }
+
+    /// Codellama infill tokens
+    #[must_use]
+    pub fn token_eot(&self) -> LlamaToken {
+        let token = unsafe { llama_cpp_sys_2::llama_token_eot(self.model.as_ptr()) };
+        LlamaToken(token)
+    }
 
     /// Convert single token to a string.
     ///
     /// # Errors
     ///
     /// See [`TokenToStringError`] for more information.
-    pub fn token_to_str(&self, token: LlamaToken, special: Special) -> Result<String, TokenToStringError> {
+    pub fn token_to_str(
+        &self,
+        token: LlamaToken,
+        special: Special,
+    ) -> Result<String, TokenToStringError> {
         self.token_to_str_with_size(token, 32, special)
     }
 
@@ -122,7 +189,11 @@ impl LlamaModel {
     /// # Errors
     ///
     /// See [`TokenToStringError`] for more information.
-    pub fn token_to_bytes(&self, token: LlamaToken, special: Special) -> Result<Vec<u8>, TokenToStringError> {
+    pub fn token_to_bytes(
+        &self,
+        token: LlamaToken,
+        special: Special,
+    ) -> Result<Vec<u8>, TokenToStringError> {
         self.token_to_bytes_with_size(token, 32, special)
     }
 
@@ -131,9 +202,17 @@ impl LlamaModel {
     /// # Errors
     ///
     /// See [`TokenToStringError`] for more information.
-    pub fn tokens_to_str(&self, tokens: &[LlamaToken], special: Special) -> Result<String, TokenToStringError> {
+    pub fn tokens_to_str(
+        &self,
+        tokens: &[LlamaToken],
+        special: Special,
+    ) -> Result<String, TokenToStringError> {
         let mut builder = String::with_capacity(tokens.len() * 4);
-        for str in tokens.iter().copied().map(|t| self.token_to_str(t, special)) {
+        for str in tokens
+            .iter()
+            .copied()
+            .map(|t| self.token_to_str(t, special))
+        {
             builder += &str?;
         }
         Ok(builder)
@@ -475,6 +554,11 @@ impl LlamaModel {
             String::from_utf8(buff.iter().filter(|c| **c > 0).map(|&c| c as u8).collect())
         }?;
         Ok(formatted_chat)
+    }
+
+    ///meta api
+    pub fn meta_count(&self) -> usize {
+        unsafe { llama_cpp_sys_2::llama_model_meta_count(self.model.as_ptr()) as _ }
     }
 }
 
