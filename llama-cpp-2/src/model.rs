@@ -134,6 +134,9 @@ impl LlamaModel {
 
     ///Vocab
     pub fn token_get_text(&self, token: LlamaToken) -> String {
+        if token.0 < 0 {
+            return "Nil".to_string();
+        }
         unsafe {
             let char_ptr = llama_cpp_sys_2::llama_token_get_text(self.model.as_ptr(), token.0);
             CStr::from_ptr(char_ptr).to_string_lossy().to_string()
