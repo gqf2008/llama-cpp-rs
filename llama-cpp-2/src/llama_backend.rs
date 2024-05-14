@@ -1,84 +1,37 @@
 //! Representation of an initialized llama backend
 
 use llama_cpp_sys_2::ggml_log_level;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering::SeqCst;
-use std::sync::Once;
-
 /// Representation of an initialized llama backend
 /// This is required as a parameter for most llama functions as the backend must be initialized
 /// before any llama functions are called. This type is proof of initialization.
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Debug)]
 pub struct LlamaBackend;
 
-static LLAMA_BACKEND_INITIALIZED: AtomicBool = AtomicBool::new(false);
-static START: Once = Once::new();
+static BACKEND: std::sync::OnceLock<LlamaBackend> = std::sync::OnceLock::new();
 
 impl LlamaBackend {
     /// Mark the llama backend as initialized
-    // fn mark_init() -> crate::Result<()> {
-    //     match LLAMA_BACKEND_INITIALIZED.compare_exchange(false, true, SeqCst, SeqCst) {
-    //         Ok(_) => Ok(()),
-    //         Err(_) => Err(LLamaCppError::BackendAlreadyInitialized),
-    //     }
-    // }
-
-    /// Initialize the llama backend (without numa).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    ///# use llama_cpp_2::llama_backend::LlamaBackend;
-    ///# use llama_cpp_2::LLamaCppError;
-    ///# use std::error::Error;
-    ///
-    ///# fn main() -> Result<(), Box<dyn Error>> {
-    ///
-    ///
-    /// let backend = LlamaBackend::init()?;
-    /// // the llama backend can only be initialized once
-    /// assert_eq!(Err(LLamaCppError::BackendAlreadyInitialized), LlamaBackend::init());
-    ///
-    ///# Ok(())
-    ///# }
-    /// ```
-    #[tracing::instrument(skip_all)]
+    // #[tracing::instrument(skip_all)]
     pub fn init() {
-        START.call_once(|| {
-            LLAMA_BACKEND_INITIALIZED.store(true, SeqCst);
-            unsafe { llama_cpp_sys_2::llama_backend_init() }
+        BACKEND.get_or_init(|| {
+            unsafe {
+                llama_cpp_sys_2::llama_backend_init();
+            }
+            LlamaBackend
         });
     }
 
     /// Initialize the llama backend (with numa).
-    /// ```
-    ///# use llama_cpp_2::llama_backend::LlamaBackend;
-    ///# use std::error::Error;
-    ///# use llama_cpp_2::llama_backend::NumaStrategy;
-    ///
-    ///# fn main() -> Result<(), Box<dyn Error>> {
-    ///
-    /// let llama_backend = LlamaBackend::init_numa(NumaStrategy::MIRROR)?;
-    ///
-    ///# Ok(())
-    ///# }
-    /// ```
     #[tracing::instrument(skip_all)]
     pub fn init_numa(strategy: NumaStrategy) {
-        START.call_once(|| unsafe {
-            LLAMA_BACKEND_INITIALIZED.store(true, SeqCst);
-            llama_cpp_sys_2::llama_numa_init(llama_cpp_sys_2::ggml_numa_strategy::from(strategy))
+        BACKEND.get_or_init(|| {
+            unsafe {
+                llama_cpp_sys_2::llama_numa_init(llama_cpp_sys_2::ggml_numa_strategy::from(
+                    strategy,
+                ));
+            }
+            LlamaBackend
         });
-    }
-    /// deinit
-    #[tracing::instrument(skip_all)]
-    pub fn deinit() {
-        if LLAMA_BACKEND_INITIALIZED
-            .compare_exchange(true, false, SeqCst, SeqCst)
-            .is_ok()
-        {
-            unsafe { llama_cpp_sys_2::llama_backend_free() }
-        }
     }
 
     /// Change the output of llama.cpp's logging to be voided instead of pushed to `stderr`.
@@ -164,17 +117,11 @@ impl From<NumaStrategy> for llama_cpp_sys_2::ggml_numa_strategy {
 ///# }
 ///
 /// ```
-// impl Drop for LlamaBackend {
-//     fn drop(&mut self) {
-//         match LLAMA_BACKEND_INITIALIZED.compare_exchange(true, false, SeqCst, SeqCst) {
-//             Ok(_) => {}
-//             Err(_) => {
-//                 unreachable!("This should not be reachable as the only ways to obtain a llama backend involve marking the backend as initialized.")
-//             }
-//         }
-//         unsafe { llama_cpp_sys_2::llama_backend_free() }
-//     }
-// }
+impl Drop for LlamaBackend {
+    fn drop(&mut self) {
+        unsafe { llama_cpp_sys_2::llama_backend_free() }
+    }
+}
 
 #[cfg(test)]
 mod tests {
