@@ -27,16 +27,16 @@ pub struct LlamaModel {
 /// A Safe wrapper around `llama_chat_message`
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct LlamaChatMessage {
-    role: CString,
-    content: CString,
+    role: String,
+    content: String,
 }
 
 impl LlamaChatMessage {
     /// Create a new `LlamaChatMessage`
-    pub fn new<T: Into<Vec<u8>>>(role: T, content: T) -> Self {
+    pub fn new<T: Into<String>>(role: T, content: T) -> Self {
         Self {
-            role: CString::new(role).expect("invalid string"),
-            content: CString::new(content).expect("invalid string"),
+            role: role.into(),
+            content: content.into(),
         }
     }
 }
@@ -519,16 +519,20 @@ impl LlamaModel {
     ) -> Result<String, ApplyChatTemplateError> {
         // Buffer is twice the length of messages per their recommendation
         let message_length = chat.iter().fold(0, |acc, c| {
-            acc + c.role.to_bytes().len() + c.content.to_bytes().len()
+            acc + c.role.as_bytes().len() + c.content.as_bytes().len()
         });
         let mut buff: Vec<i8> = vec![0_i8; message_length * 2];
 
         // Build our llama_cpp_sys_2 chat messages
         let chat: Vec<llama_cpp_sys_2::llama_chat_message> = chat
             .iter()
-            .map(|c| llama_cpp_sys_2::llama_chat_message {
-                role: c.role.as_ptr(),
-                content: c.content.as_ptr(),
+            .map(|c| {
+                let role = CString::new(c.role.as_str()).unwrap();
+                let content = CString::new(c.content.as_str()).unwrap();
+                llama_cpp_sys_2::llama_chat_message {
+                    role: role.as_ptr() as _,
+                    content: content.as_ptr() as _,
+                }
             })
             .collect();
         // Set the tmpl pointer
