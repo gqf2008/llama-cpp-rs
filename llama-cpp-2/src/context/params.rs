@@ -339,6 +339,32 @@ impl LlamaContextParams {
         self.context_params.embeddings = embedding;
         self
     }
+
+    /// Check whether flash_attn are enabled
+    #[must_use]
+    pub fn flash_attn(&self) -> bool {
+        self.context_params.flash_attn
+    }
+
+    /// Enable the use of flash_attn
+    #[must_use]
+    pub fn with_flash_attn(mut self, flash_attn: bool) -> Self {
+        self.context_params.flash_attn = flash_attn;
+        self
+    }
+
+    /// Get defrag_thold
+    #[must_use]
+    pub fn defrag_thold(&self) -> f32 {
+        self.context_params.defrag_thold
+    }
+
+    /// Set defrag_thold
+    #[must_use]
+    pub fn with_defrag_thold(mut self, defrag_thold: f32) -> Self {
+        self.context_params.defrag_thold = defrag_thold;
+        self
+    }
 }
 
 /// Default parameters for `LlamaContext`. (as defined in llama.cpp by `llama_context_default_params`)
