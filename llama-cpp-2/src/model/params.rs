@@ -174,6 +174,18 @@ impl LlamaModelParams {
         self.params.use_mlock = use_mlock;
         self
     }
+    /// sets `use_mmap`
+    #[must_use]
+    pub fn with_use_mmap(mut self, use_mmap: bool) -> Self {
+        self.params.use_mmap = use_mmap;
+        self
+    }
+    /// sets `check_tensors`
+    #[must_use]
+    pub fn with_check_tensors(mut self, check_tensors: bool) -> Self {
+        self.params.check_tensors = check_tensors;
+        self
+    }
 }
 
 /// Default parameters for `LlamaModel`. (as defined in llama.cpp by `llama_model_default_params`)
