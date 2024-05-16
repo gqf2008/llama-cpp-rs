@@ -6,7 +6,6 @@ use std::ptr::NonNull;
 
 use crate::context::params::LlamaContextParams;
 use crate::context::LlamaContext;
-use crate::llama_backend::LlamaBackend;
 use crate::model::params::LlamaModelParams;
 use crate::token::LlamaToken;
 use crate::token_type::LlamaTokenType;
@@ -34,7 +33,7 @@ pub struct LlamaChatMessage {
 
 impl LlamaChatMessage {
     /// Create a new `LlamaChatMessage`
-    pub fn new(role: String, content: String) -> Result<Self, NewLlamaChatMessageError> {
+    pub fn new<T: Into<Vec<u8>>>(role: T, content: T) -> Result<Self, NewLlamaChatMessageError> {
         Ok(Self {
             role: CString::new(role)?,
             content: CString::new(content)?,
