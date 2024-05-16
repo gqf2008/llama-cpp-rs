@@ -33,11 +33,11 @@ pub struct LlamaChatMessage {
 
 impl LlamaChatMessage {
     /// Create a new `LlamaChatMessage`
-    pub fn new<T: Into<Vec<u8>>>(role: T, content: T) -> Result<Self, NewLlamaChatMessageError> {
-        Ok(Self {
-            role: CString::new(role)?,
-            content: CString::new(content)?,
-        })
+    pub fn new<T: Into<Vec<u8>>>(role: T, content: T) -> Self {
+        Self {
+            role: CString::new(role).expect("invalid string"),
+            content: CString::new(content).expect("invalid string"),
+        }
     }
 }
 
