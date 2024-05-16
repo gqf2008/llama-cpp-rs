@@ -264,3 +264,14 @@ pub fn ggml_time_us() -> i64 {
 pub fn llama_supports_mlock() -> bool {
     unsafe { llama_cpp_sys_2::llama_supports_mlock() }
 }
+
+#[derive(Debug, thiserror::Error)]
+pub enum LlamaMetaError {
+    #[error("The buffer was too small. Please contact a maintainer and we will update it.")]
+    BuffSizeError,
+
+    #[error("{0}")]
+    UnknownError(i32),
+    #[error("invalid utf8 string")]
+    FromUtf8Error,
+}

@@ -10,8 +10,8 @@ use crate::model::params::LlamaModelParams;
 use crate::token::LlamaToken;
 use crate::token_type::LlamaTokenType;
 use crate::{
-    ApplyChatTemplateError, ChatTemplateError, LlamaContextLoadError, LlamaModelLoadError,
-    NewLlamaChatMessageError, StringToTokenError, TokenToStringError,
+    ApplyChatTemplateError, ChatTemplateError, LlamaContextLoadError, LlamaMetaError,
+    LlamaModelLoadError, StringToTokenError, TokenToStringError,
 };
 
 pub mod params;
@@ -560,6 +560,36 @@ impl LlamaModel {
     ///meta api
     pub fn meta_count(&self) -> usize {
         unsafe { llama_cpp_sys_2::llama_model_meta_count(self.model.as_ptr()) as _ }
+    }
+
+    ///meta api
+    pub fn meta_val(&self, key: &str) -> Result<Option<String>, LlamaMetaError> {
+        let key = CString::new(key).expect("invalid string");
+        const BUF_LEN: usize = 1024;
+        let mut buff: Vec<i8> = vec![0_i8; BUF_LEN];
+        let res = unsafe {
+            llama_cpp_sys_2::llama_model_meta_val_str(
+                self.model.as_ptr(),
+                key.as_ptr(),
+                buff.as_mut_ptr(),
+                BUF_LEN as _,
+            )
+        };
+
+        if res < 0 {
+            return Err(LlamaMetaError::UnknownError(res));
+        }
+        if res == 0 {
+            return Ok(None);
+        }
+        if res > buff.len() as i32 {
+            return Err(LlamaMetaError::BuffSizeError);
+        }
+        let val = String::from_utf8(buff.iter().filter(|c| **c > 0).map(|&c| c as u8).collect());
+        if val.is_err() {
+            return Err(LlamaMetaError::FromUtf8Error);
+        }
+        Ok(Some(val.unwrap()))
     }
 }
 
