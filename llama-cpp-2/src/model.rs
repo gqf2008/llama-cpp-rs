@@ -27,8 +27,8 @@ pub struct LlamaModel {
 /// A Safe wrapper around `llama_chat_message`
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct LlamaChatMessage {
-    role: String,
-    content: String,
+    pub role: String,
+    pub content: String,
 }
 
 impl LlamaChatMessage {
