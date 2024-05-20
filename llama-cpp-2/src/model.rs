@@ -421,8 +421,14 @@ impl LlamaModel {
     /// This returns a `c_int` for maximum compatibility. Most of the time it can be cast to an i32
     /// without issue.
     #[must_use]
-    pub fn n_embd(&self) -> c_int {
+    pub fn n_embd(&self) -> i32 {
         unsafe { llama_cpp_sys_2::llama_n_embd(self.model.as_ptr()) }
+    }
+
+    /// get n_layer
+    #[must_use]
+    pub fn n_layer(&self) -> i32 {
+        unsafe { llama_cpp_sys_2::llama_n_layer(self.model.as_ptr()) }
     }
 
     /// Get chat template from model.
