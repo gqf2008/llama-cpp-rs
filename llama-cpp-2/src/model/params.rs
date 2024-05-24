@@ -3,7 +3,6 @@
 use crate::model::params::kv_overrides::KvOverrides;
 use std::ffi::{c_char, CStr};
 use std::fmt::{Debug, Formatter};
-use std::pin::Pin;
 use std::ptr::null;
 
 pub mod kv_overrides;
@@ -67,11 +66,7 @@ impl LlamaModelParams {
     /// assert_eq!(k.to_bytes(), b"key", "expected key to be 'key', was {:?}", k);
     /// ```
     #[allow(clippy::missing_panics_doc)] // panics are just to enforce internal invariants, not user errors
-    pub fn append_kv_override(
-        mut self: Pin<&mut Self>,
-        key: &CStr,
-        value: kv_overrides::ParamOverrideValue,
-    ) {
+    pub fn append_kv_override(&mut self, key: &CStr, value: kv_overrides::ParamOverrideValue) {
         let kv_override = self
             .kv_overrides
             .get_mut(0)
