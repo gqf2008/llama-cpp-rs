@@ -32,8 +32,8 @@ fn main() {
             if v > 0 {
                 max_copies = env_max_copies;
             }
-        } 
-    } 
+        }
+    }
     ggml.define("GGML_SCHED_MAX_COPIES", Some(max_copies.as_str()));
 
     // https://github.com/ggerganov/llama.cpp/blob/a836c8f534ab789b02da149fbdaf7735500bff74/Makefile#L364-L368
@@ -68,10 +68,11 @@ fn main() {
             .cuda(true)
             .flag("-arch=all")
             .file("llama.cpp/ggml-cuda.cu")
-            .files(std::fs::read_dir("llama.cpp/ggml-cuda")
-                .expect("failed to read 'llama.cpp/ggml-cuda'")
-                .map(|e| e.expect("failed to ready entry").path())
-                .filter(|p| p.extension().is_some_and(|it| it == OsStr::new("cu")))
+            .files(
+                std::fs::read_dir("llama.cpp/ggml-cuda")
+                    .expect("failed to read 'llama.cpp/ggml-cuda'")
+                    .map(|e| e.expect("failed to ready entry").path())
+                    .filter(|p| p.extension().is_some_and(|it| it == OsStr::new("cu"))),
             )
             .include("llama.cpp/ggml-cuda")
             .include("llama.cpp");
@@ -185,7 +186,10 @@ fn main() {
         .std("c++11")
         .file("llama.cpp/llama.cpp")
         .file("llama.cpp/unicode.cpp")
-        .file("llama.cpp/unicode-data.cpp");
+        .file("llama.cpp/unicode-data.cpp")
+        .include("llama.cpp/common")
+        .file("llama.cpp/examples/llava/clip.cpp")
+        .file("llama.cpp/examples/llava/llava.cpp");
 
     // Remove debug log output from `llama.cpp`
     let is_release = env::var("PROFILE").unwrap() == "release";
@@ -220,6 +224,9 @@ fn main() {
 
     let bindings = bindgen::builder()
         .header(header)
+        .header("llama.cpp/examples/llava/clip.h")
+        .clang_arg("-Illama.cpp")
+        .header("llama.cpp/examples/llava/llava.h")
         .derive_partialeq(true)
         .no_debug("llama_grammar_element")
         .prepend_enum_name(false)
@@ -252,16 +259,15 @@ fn metal_hack(build: &mut cc::Build) {
             .replace('\r', "\\r")
             .replace('\"', "\\\"");
 
-        let ggml_common = std::fs::read_to_string(GGML_COMMON_PATH).expect("Could not read ggml-common.h")
+        let ggml_common = std::fs::read_to_string(GGML_COMMON_PATH)
+            .expect("Could not read ggml-common.h")
             .replace('\\', "\\\\")
             .replace('\n', "\\n")
             .replace('\r', "\\r")
             .replace('\"', "\\\"");
 
-        let includged_ggml_metal_metal = ggml_metal_metal.replace(
-            "#include \\\"ggml-common.h\\\"",
-            &format!("{ggml_common}")
-        );
+        let includged_ggml_metal_metal =
+            ggml_metal_metal.replace("#include \\\"ggml-common.h\\\"", &format!("{ggml_common}"));
         print!("{}", &includged_ggml_metal_metal);
 
         let ggml_metal =
