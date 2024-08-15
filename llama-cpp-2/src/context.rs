@@ -1,14 +1,17 @@
 //! Safe wrapper around `llama_context`.
 
 use std::fmt::{Debug, Formatter};
+use std::io::Write;
 use std::num::NonZeroI32;
 use std::ptr::NonNull;
 use std::slice;
+use std::time::Duration;
 
 use crate::llama_batch::LlamaBatch;
-use crate::model::{LlamaLoraAdapter, LlamaModel};
+use crate::model::{AddBos, LlamaLoraAdapter, LlamaModel, Special};
 use crate::timing::LlamaTimings;
 use crate::token::data::LlamaTokenData;
+use crate::token::data_array::LlamaTokenDataArray;
 use crate::token::LlamaToken;
 use crate::{
     DecodeError, EmbeddingsError, EncodeError, LlamaLoraAdapterRemoveError,
@@ -277,6 +280,105 @@ impl LlamaContext {
 
         tracing::debug!("Remove lora adapter");
         Ok(())
+    }
+}
+
+impl LlamaContext {
+    /// forward
+    pub fn forward<S: AsRef<str>>(&mut self, prompt: S, max_length: i32) -> anyhow::Result<String> {
+        let tokens_list = self.model.str_to_token(prompt.as_ref(), AddBos::Always)?;
+        let n_cxt = self.n_ctx() as i32;
+        let n_kv_req = tokens_list.len() as i32 + (max_length - tokens_list.len() as i32);
+        eprintln!("max_length = {max_length}, n_ctx = {n_cxt}, k_kv_req = {n_kv_req}");
+        if n_kv_req > n_cxt {
+            anyhow::bail!(
+                "n_kv_req > n_ctx, the required kv cache size is not big enough
+    either reduce n_len or increase n_ctx"
+            )
+        }
+        if tokens_list.len() >= usize::try_from(max_length)? {
+            anyhow::bail!("the prompt is too long, it has more tokens than max_length")
+        }
+        eprintln!();
+
+        for token in &tokens_list {
+            eprint!("{}", self.model.token_to_str(*token, Special::Tokenize)?);
+        }
+
+        std::io::stderr().flush()?;
+
+        // create a llama_batch with size 512
+        // we use this object to submit token data for decoding
+        let mut batch = LlamaBatch::new(tokens_list.len(), 1);
+
+        let last_index: i32 = (tokens_list.len() - 1) as i32;
+        for (i, token) in (0_i32..).zip(tokens_list.into_iter()) {
+            // llama_decode will output logits only for the last token of the prompt
+            let is_last = i == last_index;
+            batch.add(token, i, &[0], is_last)?;
+        }
+
+        self.decode(&mut batch)?;
+
+        // main loop
+
+        let mut n_cur = batch.n_tokens();
+        let mut n_decode = 0;
+
+        let t_main_start = crate::ggml_time_us();
+        let mut output = String::new();
+        // The `Decoder`
+        let mut decoder = encoding_rs::UTF_8.new_decoder();
+
+        while n_cur <= max_length {
+            // sample the next token
+            {
+                let candidates = self.candidates_ith(batch.n_tokens() - 1);
+
+                let candidates_p = LlamaTokenDataArray::from_iter(candidates, false);
+
+                // sample the most likely token
+                let new_token_id = self.sample_token_greedy(candidates_p);
+
+                // is it an end of stream?
+                if new_token_id == self.model.token_eos() || new_token_id == self.model.token_eot()
+                {
+                    eprintln!();
+                    break;
+                }
+
+                let output_bytes = self.model.token_to_bytes(new_token_id, Special::Tokenize)?;
+                // use `Decoder.decode_to_string()` to avoid the intermediate buffer
+                let mut output_string = String::with_capacity(32);
+                let _decode_result =
+                    decoder.decode_to_string(&output_bytes, &mut output_string, false);
+                print!("{output_string}");
+                std::io::stdout().flush()?;
+                output.push_str(output_string.as_str());
+                batch.clear();
+                batch.add(new_token_id, n_cur, &[0], true)?;
+            }
+
+            n_cur += 1;
+
+            self.decode(&mut batch)?;
+
+            n_decode += 1;
+        }
+
+        eprintln!("\n");
+
+        let t_main_end = crate::ggml_time_us();
+        let duration = Duration::from_micros((t_main_end - t_main_start) as u64);
+        eprintln!(
+            "decoded {} tokens in {:.2} s, speed {:.2} t/s\n",
+            n_decode,
+            duration.as_secs_f32(),
+            n_decode as f32 / duration.as_secs_f32()
+        );
+
+        println!("{}", self.timings());
+        Ok(output)
     }
 }
 
