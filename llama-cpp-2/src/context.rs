@@ -22,31 +22,31 @@ pub mod session;
 
 /// Safe wrapper around `llama_context`.
 #[allow(clippy::module_name_repetitions)]
-pub struct LlamaContext<'a> {
+pub struct LlamaContext {
     pub(crate) context: NonNull<llama_cpp_sys_2::llama_context>,
-    /// a reference to the contexts model.
-    pub model: &'a LlamaModel,
     initialized_logits: Vec<i32>,
     embeddings_enabled: bool,
+    /// model
+    pub model: LlamaModel,
 }
 
-impl Debug for LlamaContext<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl Debug for LlamaContext {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         f.debug_struct("LlamaContext")
             .field("context", &self.context)
             .finish()
     }
 }
 
-impl<'model> LlamaContext<'model> {
+impl LlamaContext {
     pub(crate) fn new(
-        llama_model: &'model LlamaModel,
+        model: LlamaModel,
         llama_context: NonNull<llama_cpp_sys_2::llama_context>,
         embeddings_enabled: bool,
     ) -> Self {
         Self {
+            model,
             context: llama_context,
-            model: llama_model,
             initialized_logits: Vec::new(),
             embeddings_enabled,
         }
@@ -280,7 +280,7 @@ impl<'model> LlamaContext<'model> {
     }
 }
 
-impl Drop for LlamaContext<'_> {
+impl Drop for LlamaContext {
     fn drop(&mut self) {
         unsafe { llama_cpp_sys_2::llama_free(self.context.as_ptr()) }
     }

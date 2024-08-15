@@ -4,6 +4,7 @@ use std::num::NonZeroU16;
 use std::os::raw::c_int;
 use std::path::Path;
 use std::ptr::NonNull;
+use std::sync::OnceLock;
 
 use crate::context::params::LlamaContextParams;
 use crate::context::LlamaContext;
@@ -17,9 +18,15 @@ use crate::{
 };
 
 pub mod params;
+/// init llama_backend
+fn backend() -> &'static LlamaBackend {
+    static ONCE: OnceLock<LlamaBackend> = OnceLock::new();
+    let backend = ONCE.get_or_init(|| LlamaBackend::init().unwrap());
+    backend
+}
 
 /// A safe wrapper around `llama_model`.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[repr(transparent)]
 #[allow(clippy::module_name_repetitions)]
 pub struct LlamaModel {
@@ -427,10 +434,10 @@ impl LlamaModel {
     /// See [`LlamaModelLoadError`] for more information.
     #[tracing::instrument(skip_all, fields(params))]
     pub fn load_from_file(
-        _: &LlamaBackend,
         path: impl AsRef<Path>,
         params: &LlamaModelParams,
     ) -> Result<Self, LlamaModelLoadError> {
+        backend();
         let path = path.as_ref();
         debug_assert!(Path::new(path).exists(), "{path:?} does not exist");
         let path = path
@@ -486,7 +493,6 @@ impl LlamaModel {
     #[allow(clippy::needless_pass_by_value)]
     pub fn new_context(
         &self,
-        _: &LlamaBackend,
         params: LlamaContextParams,
     ) -> Result<LlamaContext, LlamaContextLoadError> {
         let context_params = params.context_params;
@@ -494,8 +500,11 @@ impl LlamaModel {
             llama_cpp_sys_2::llama_new_context_with_model(self.model.as_ptr(), context_params)
         };
         let context = NonNull::new(context).ok_or(LlamaContextLoadError::NullReturn)?;
-
-        Ok(LlamaContext::new(self, context, params.embeddings()))
+        Ok(LlamaContext::new(
+            self.clone(),
+            context,
+            params.embeddings(),
+        ))
     }
 
     /// Apply the models chat template to some messages.

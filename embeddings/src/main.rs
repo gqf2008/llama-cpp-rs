@@ -82,9 +82,6 @@ fn main() -> Result<()> {
         disable_gpu,
     } = Args::parse();
 
-    // init LLM
-    let backend = LlamaBackend::init()?;
-
     // offload all layers to the gpu
     let model_params = {
         #[cfg(any(feature = "cuda", feature = "vulkan"))]
@@ -101,7 +98,7 @@ fn main() -> Result<()> {
         .get_or_load()
         .with_context(|| "failed to get model from args")?;
 
-    let model = LlamaModel::load_from_file(&backend, model_path, &model_params)
+    let model = LlamaModel::load_from_file(model_path, &model_params)
         .with_context(|| "unable to load model")?;
 
     // initialize the context
@@ -110,7 +107,7 @@ fn main() -> Result<()> {
         .with_embeddings(true);
 
     let mut ctx = model
-        .new_context(&backend, ctx_params)
+        .new_context(ctx_params)
         .with_context(|| "unable to create the llama_context")?;
 
     // Split the prompt to display the batching functionality
