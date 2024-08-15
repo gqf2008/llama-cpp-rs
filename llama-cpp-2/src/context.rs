@@ -296,9 +296,11 @@ impl LlamaContext {
     either reduce n_len or increase n_ctx"
             )
         }
+
         if tokens_list.len() >= usize::try_from(max_length)? {
             anyhow::bail!("the prompt is too long, it has more tokens than max_length")
         }
+        self.clear_kv_cache();
         let mut batch = LlamaBatch::new(tokens_list.len(), 1);
 
         let last_index: i32 = (tokens_list.len() - 1) as i32;
