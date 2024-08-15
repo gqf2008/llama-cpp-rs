@@ -123,6 +123,12 @@ impl LlamaModel {
         let token = unsafe { llama_cpp_sys_2::llama_token_nl(self.model.as_ptr()) };
         LlamaToken(token)
     }
+    /// Get the eot token.
+    #[must_use]
+    pub fn token_eot(&self) -> LlamaToken {
+        let token = unsafe { llama_cpp_sys_2::llama_token_eot(self.model.as_ptr()) };
+        LlamaToken(token)
+    }
 
     /// Get the decoder start token token.
     #[must_use]
