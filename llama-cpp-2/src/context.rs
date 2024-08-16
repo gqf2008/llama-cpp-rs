@@ -298,13 +298,10 @@ impl LlamaContext {
     either reduce n_len or increase n_ctx"
             )
         }
-
         if tokens_list.len() >= usize::try_from(max_length)? {
             anyhow::bail!("the prompt is too long, it has more tokens than max_length")
         }
-
-        let mut batch = LlamaBatch::new(tokens_list.len(), 1);
-
+        let mut batch = LlamaBatch::new(max_length as _, 1);
         let last_index: i32 = (tokens_list.len() - 1) as i32;
         for (i, token) in (0_i32..).zip(tokens_list.into_iter()) {
             let is_last = i == last_index;
@@ -315,7 +312,6 @@ impl LlamaContext {
         println!("decode {:?}", now.elapsed());
         let mut n_cur = batch.n_tokens();
         let mut n_decode = 0;
-
         let t_main_start = crate::ggml_time_us();
         let mut output = String::new();
         let mut decoder = encoding_rs::UTF_8.new_decoder();
@@ -323,16 +319,9 @@ impl LlamaContext {
         while n_cur <= max_length {
             {
                 let candidates = self.candidates_ith(batch.n_tokens() - 1);
-
                 let candidates_p = LlamaTokenDataArray::from_iter(candidates, false);
-
-                // sample the most likely token
                 let new_token_id = self.sample_token_greedy(candidates_p);
-
-                // is it an end of stream?
-                if new_token_id == self.model.token_eos() || new_token_id == self.model.token_eot()
-                {
-                    // eprintln!();
+                if self.model.token_is_eog(new_token_id) || n_cur == max_length {
                     break;
                 }
                 let now = Instant::now();
@@ -346,11 +335,10 @@ impl LlamaContext {
                 batch.clear();
                 batch.add(new_token_id, n_cur, &[0], true)?;
             }
-
             n_cur += 1;
-
+            let now = Instant::now();
             self.decode(&mut batch)?;
-
+            println!("decode {:?}", now.elapsed());
             n_decode += 1;
         }
         log::debug!("{output}");

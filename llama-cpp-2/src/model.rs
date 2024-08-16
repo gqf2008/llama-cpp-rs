@@ -134,6 +134,13 @@ impl LlamaModel {
             unsafe { llama_cpp_sys_2::llama_token_eot(self.model.lock().unwrap().as_ptr()) };
         LlamaToken(token)
     }
+    /// Get the is eog.
+    #[must_use]
+    pub fn token_is_eog(&self, LlamaToken(token_id): LlamaToken) -> bool {
+        unsafe {
+            llama_cpp_sys_2::llama_token_is_eog(self.model.lock().unwrap().as_ptr(), token_id)
+        }
+    }
 
     /// Get the decoder start token token.
     #[must_use]
