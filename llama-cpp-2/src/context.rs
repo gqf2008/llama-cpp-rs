@@ -324,10 +324,7 @@ impl LlamaContext {
                 if self.model.token_is_eog(new_token_id) || n_cur == max_length {
                     break;
                 }
-                let now = Instant::now();
                 let output_bytes = self.model.token_to_bytes(new_token_id, Special::Tokenize)?;
-                println!("token_to_bytes {:?}", now.elapsed());
-                // use `Decoder.decode_to_string()` to avoid the intermediate buffer
                 let mut output_string = String::with_capacity(32);
                 let _decode_result =
                     decoder.decode_to_string(&output_bytes, &mut output_string, false);
