@@ -17,6 +17,7 @@ use crate::{
     DecodeError, EmbeddingsError, EncodeError, LlamaLoraAdapterRemoveError,
     LlamaLoraAdapterSetError,
 };
+use derive_more::{Deref, DerefMut};
 
 pub mod kv_cache;
 pub mod params;
@@ -29,7 +30,6 @@ pub struct LlamaContext {
     pub(crate) context: NonNull<llama_cpp_sys_2::llama_context>,
     initialized_logits: Vec<i32>,
     embeddings_enabled: bool,
-    /// model
     pub model: LlamaModel,
 }
 
@@ -300,7 +300,7 @@ impl LlamaContext {
         if tokens_list.len() >= usize::try_from(max_length)? {
             anyhow::bail!("the prompt is too long, it has more tokens than max_length")
         }
-        self.clear_kv_cache();
+
         let mut batch = LlamaBatch::new(tokens_list.len(), 1);
 
         let last_index: i32 = (tokens_list.len() - 1) as i32;

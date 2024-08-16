@@ -16,6 +16,7 @@ tracing = { workspace = true }
 anyhow = { workspace = true }
 encoding_rs = { workspace = true }
 log = { workspace = true }
+derive_more = { workspace = true }
 
 [features]
 cuda = ["llama-cpp-sys-2/cuda"]
