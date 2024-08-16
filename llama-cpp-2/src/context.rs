@@ -333,9 +333,9 @@ impl LlamaContext {
                 batch.add(new_token_id, n_cur, &[0], true)?;
             }
             n_cur += 1;
-            // let now = Instant::now();
-            // self.decode(&mut batch)?;
-            // println!("decode {:?}", now.elapsed());
+            let now = Instant::now();
+            self.decode(&mut batch)?;
+            println!("decode {:?}", now.elapsed());
             n_decode += 1;
         }
         log::debug!("{output}");
