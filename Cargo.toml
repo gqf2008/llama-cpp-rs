@@ -17,7 +17,7 @@ anyhow = "1.0.86"
 clap = "4.5.15"
 encoding_rs = "0.8.34"
 log = "0.4.22"
-derive_more = "1.0.0"
+derive_more = { version = "1.0.0", features = ["full"] }
 
 [workspace.lints.rust]
 missing_docs = { level = "warn" }
