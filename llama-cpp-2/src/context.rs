@@ -1,7 +1,6 @@
 //! Safe wrapper around `llama_context`.
 
 use std::fmt::{Debug, Formatter};
-use std::io::Write;
 use std::num::NonZeroI32;
 use std::ptr::NonNull;
 use std::slice;
@@ -17,7 +16,6 @@ use crate::{
     DecodeError, EmbeddingsError, EncodeError, LlamaLoraAdapterRemoveError,
     LlamaLoraAdapterSetError,
 };
-use derive_more::{Deref, DerefMut};
 
 pub mod kv_cache;
 pub mod params;
@@ -30,6 +28,7 @@ pub struct LlamaContext {
     pub(crate) context: NonNull<llama_cpp_sys_2::llama_context>,
     initialized_logits: Vec<i32>,
     embeddings_enabled: bool,
+    /// model
     pub model: LlamaModel,
 }
 
@@ -301,7 +300,7 @@ impl LlamaContext {
         if tokens_list.len() >= usize::try_from(max_length)? {
             anyhow::bail!("the prompt is too long, it has more tokens than max_length")
         }
-        let mut batch = LlamaBatch::new(max_length as _, 1);
+        let mut batch = LlamaBatch::new(n_cxt as _, 1);
         let last_index: i32 = (tokens_list.len() - 1) as i32;
         for (i, token) in (0_i32..).zip(tokens_list.into_iter()) {
             let is_last = i == last_index;
@@ -315,7 +314,7 @@ impl LlamaContext {
         let t_main_start = crate::ggml_time_us();
         let mut output = String::new();
         let mut decoder = encoding_rs::UTF_8.new_decoder();
-
+        // let cache_view = self.new_kv_cache_view(1);
         while n_cur <= max_length {
             {
                 let candidates = self.candidates_ith(batch.n_tokens() - 1);
@@ -326,8 +325,7 @@ impl LlamaContext {
                 }
                 let output_bytes = self.model.token_to_bytes(new_token_id, Special::Tokenize)?;
                 let mut output_string = String::with_capacity(32);
-                let _decode_result =
-                    decoder.decode_to_string(&output_bytes, &mut output_string, false);
+                let _ = decoder.decode_to_string(&output_bytes, &mut output_string, false);
                 output.push_str(output_string.as_str());
                 batch.clear();
                 batch.add(new_token_id, n_cur, &[0], true)?;
