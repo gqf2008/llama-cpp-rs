@@ -18,10 +18,10 @@ use std::fmt::Debug;
 use std::num::NonZeroI32;
 
 use crate::llama_batch::BatchAddError;
+pub use llama_cpp_sys_2 as sys;
 use std::os::raw::c_int;
 use std::path::PathBuf;
 use std::string::FromUtf8Error;
-
 pub mod context;
 pub mod grammar;
 pub mod llama_backend;
