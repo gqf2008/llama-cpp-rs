@@ -5,7 +5,7 @@ use std::io::Write;
 use std::num::NonZeroI32;
 use std::ptr::NonNull;
 use std::slice;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::llama_batch::LlamaBatch;
 use crate::model::{AddBos, LlamaLoraAdapter, LlamaModel, Special};
@@ -286,7 +286,9 @@ impl LlamaContext {
 impl LlamaContext {
     /// forward
     pub fn forward<S: AsRef<str>>(&mut self, prompt: S, max_length: i32) -> anyhow::Result<String> {
+        let now = Instant::now();
         let tokens_list = self.model.str_to_token(prompt.as_ref(), AddBos::Always)?;
+        println!("str_to_token {:?}", now.elapsed());
         let n_cxt = self.n_ctx() as i32;
         let n_kv_req = tokens_list.len() as i32 + (max_length - tokens_list.len() as i32);
         log::debug!("max_length = {max_length}, n_ctx = {n_cxt}, k_kv_req = {n_kv_req}");
@@ -308,7 +310,9 @@ impl LlamaContext {
             let is_last = i == last_index;
             batch.add(token, i, &[0], is_last)?;
         }
+        let now = Instant::now();
         self.decode(&mut batch)?;
+        println!("decode {:?}", now.elapsed());
         let mut n_cur = batch.n_tokens();
         let mut n_decode = 0;
 
@@ -331,8 +335,9 @@ impl LlamaContext {
                     // eprintln!();
                     break;
                 }
-
+                let now = Instant::now();
                 let output_bytes = self.model.token_to_bytes(new_token_id, Special::Tokenize)?;
+                println!("token_to_bytes {:?}", now.elapsed());
                 // use `Decoder.decode_to_string()` to avoid the intermediate buffer
                 let mut output_string = String::with_capacity(32);
                 let _decode_result =
@@ -352,13 +357,13 @@ impl LlamaContext {
 
         let t_main_end = crate::ggml_time_us();
         let duration = Duration::from_micros((t_main_end - t_main_start) as u64);
-        log::debug!(
-            "decoded {} tokens in {:.2} s, speed {:.2} t/s timings {}\n",
+        println!(
+            "decoded {} tokens in {:.2} s, speed {:.2} t/s\n",
             n_decode,
             duration.as_secs_f32(),
             n_decode as f32 / duration.as_secs_f32(),
-            self.timings()
         );
+        println!("timings\n{}", self.timings());
         Ok(output)
     }
 }
