@@ -8,7 +8,7 @@ use std::sync::{Arc, OnceLock};
 
 use crate::context::params::LlamaContextParams;
 use crate::context::LlamaContext;
-use crate::llama_backend::LlamaBackend;
+use crate::llama_backend::{LlamaBackend, NumaStrategy};
 use crate::model::params::LlamaModelParams;
 use crate::token::LlamaToken;
 use crate::token_type::{LlamaTokenAttr, LlamaTokenAttrs};
@@ -22,7 +22,7 @@ pub mod params;
 /// init llama_backend
 fn backend() -> &'static LlamaBackend {
     static ONCE: OnceLock<LlamaBackend> = OnceLock::new();
-    let backend = ONCE.get_or_init(|| LlamaBackend::init().unwrap());
+    let backend = ONCE.get_or_init(|| LlamaBackend::init_numa(NumaStrategy::DISTRIBUTE).unwrap());
     backend
 }
 
