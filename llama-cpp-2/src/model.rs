@@ -598,6 +598,7 @@ impl LlamaModel {
 
 impl Drop for LlamaModel {
     fn drop(&mut self) {
+        println!("free LlamaModel");
         unsafe { llama_cpp_sys_2::llama_free_model(self.model.lock().unwrap().as_ptr()) }
     }
 }

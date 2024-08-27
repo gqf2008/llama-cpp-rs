@@ -355,6 +355,7 @@ impl LlamaContext {
 
 impl Drop for LlamaContext {
     fn drop(&mut self) {
+        println!("free LlamaContext");
         unsafe { llama_cpp_sys_2::llama_free(self.context.as_ptr()) }
     }
 }
