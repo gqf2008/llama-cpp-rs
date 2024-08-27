@@ -15,7 +15,7 @@ use llama_cpp_2::llama_backend::LlamaBackend;
 use llama_cpp_2::llama_batch::LlamaBatch;
 use llama_cpp_2::model::params::kv_overrides::ParamOverrideValue;
 use llama_cpp_2::model::params::LlamaModelParams;
-use llama_cpp_2::model::LlamaModel;
+use llama_cpp_2::model::ModelInner;
 use llama_cpp_2::model::{AddBos, Special};
 use llama_cpp_2::token::data_array::LlamaTokenDataArray;
 use std::ffi::CString;
@@ -167,7 +167,7 @@ fn main() -> Result<()> {
         .get_or_load()
         .with_context(|| "failed to get model from args")?;
 
-    let model = LlamaModel::load_from_file(model_path, &model_params)
+    let model = ModelInner::load_from_file(model_path, &model_params)
         .with_context(|| "unable to load model")?;
 
     // initialize the context

@@ -7,7 +7,7 @@ use std::slice;
 use std::time::{Duration, Instant};
 
 use crate::llama_batch::LlamaBatch;
-use crate::model::{AddBos, LlamaLoraAdapter, LlamaModel, Special};
+use crate::model::{AddBos, LlamaLoraAdapter, LlamaModel, ModelInner, Special};
 use crate::timing::LlamaTimings;
 use crate::token::data::LlamaTokenData;
 use crate::token::data_array::LlamaTokenDataArray;
@@ -355,7 +355,6 @@ impl LlamaContext {
 
 impl Drop for LlamaContext {
     fn drop(&mut self) {
-        println!("free LlamaContext");
         unsafe { llama_cpp_sys_2::llama_free(self.context.as_ptr()) }
     }
 }

@@ -20,8 +20,8 @@ use llama_cpp_2::ggml_time_us;
 use llama_cpp_2::llama_backend::LlamaBackend;
 use llama_cpp_2::llama_batch::LlamaBatch;
 use llama_cpp_2::model::params::LlamaModelParams;
-use llama_cpp_2::model::LlamaModel;
 use llama_cpp_2::model::{AddBos, Special};
+use llama_cpp_2::model::{LlamaModel, ModelInner};
 
 #[derive(clap::Parser, Debug, Clone)]
 struct Args {
@@ -105,7 +105,6 @@ fn main() -> Result<()> {
     let ctx_params = LlamaContextParams::default()
         .with_n_threads_batch(std::thread::available_parallelism()?.get() as u32)
         .with_embeddings(true);
-
     let mut ctx = model
         .new_context(ctx_params)
         .with_context(|| "unable to create the llama_context")?;

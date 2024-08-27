@@ -1,6 +1,7 @@
 //! A safe wrapper around `llama_model`.
 use std::ffi::CString;
 use std::num::NonZeroU16;
+use std::ops::{Deref, DerefMut};
 use std::os::raw::c_int;
 use std::path::Path;
 use std::ptr::NonNull;
@@ -26,12 +27,91 @@ fn backend() -> &'static LlamaBackend {
     backend
 }
 
-/// A safe wrapper around `llama_model`.
+/// llama model
 #[derive(Debug, Clone)]
+pub struct LlamaModel {
+    inner: Arc<ModelInner>,
+}
+
+impl LlamaModel {
+    /// Loads a model from a file.
+    ///
+    /// # Errors
+    ///
+    /// See [`LlamaModelLoadError`] for more information.
+    #[tracing::instrument(skip_all, fields(params))]
+    pub fn load_from_file(
+        path: impl AsRef<Path>,
+        params: &LlamaModelParams,
+    ) -> Result<Self, LlamaModelLoadError> {
+        backend();
+        let path = path.as_ref();
+        debug_assert!(Path::new(path).exists(), "{path:?} does not exist");
+        let path = path
+            .to_str()
+            .ok_or(LlamaModelLoadError::PathToStrError(path.to_path_buf()))?;
+
+        let cstr = CString::new(path)?;
+        let llama_model =
+            unsafe { llama_cpp_sys_2::llama_load_model_from_file(cstr.as_ptr(), params.params) };
+
+        let model = NonNull::new(llama_model).ok_or(LlamaModelLoadError::NullResult)?;
+
+        tracing::debug!(?path, "Loaded model");
+        Ok(Self {
+            inner: Arc::new(ModelInner {
+                model: Mutex::new(model),
+            }),
+        })
+    }
+
+    /// Create a new context from this model.
+    ///
+    /// # Errors
+    ///
+    /// There is many ways this can fail. See [`LlamaContextLoadError`] for more information.
+    // we intentionally do not derive Copy on `LlamaContextParams` to allow llama.cpp to change the type to be non-trivially copyable.
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn new_context(
+        &self,
+        params: LlamaContextParams,
+    ) -> Result<LlamaContext, LlamaContextLoadError> {
+        let context_params = params.context_params;
+        let context = unsafe {
+            llama_cpp_sys_2::llama_new_context_with_model(
+                self.model.lock().unwrap().as_ptr(),
+                context_params,
+            )
+        };
+        let context = NonNull::new(context).ok_or(LlamaContextLoadError::NullReturn)?;
+
+        Ok(LlamaContext::new(
+            self.clone(),
+            context,
+            params.embeddings(),
+        ))
+    }
+}
+
+impl Deref for LlamaModel {
+    type Target = Arc<ModelInner>;
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for LlamaModel {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+// pub struct LlamaModel
+/// A safe wrapper around `llama_model`.
+#[derive(Debug)]
 #[repr(transparent)]
 #[allow(clippy::module_name_repetitions)]
-pub struct LlamaModel {
-    pub(crate) model: Arc<Mutex<NonNull<llama_cpp_sys_2::llama_model>>>,
+pub struct ModelInner {
+    pub(crate) model: Mutex<NonNull<llama_cpp_sys_2::llama_model>>,
 }
 
 /// A safe wrapper around `llama_lora_adapter`.
@@ -77,11 +157,11 @@ pub enum Special {
     Plaintext,
 }
 
-unsafe impl Send for LlamaModel {}
+unsafe impl Send for ModelInner {}
 
-unsafe impl Sync for LlamaModel {}
+unsafe impl Sync for ModelInner {}
 
-impl LlamaModel {
+impl ModelInner {
     /// get the number of tokens the model was trained on
     ///
     /// # Panics
@@ -449,35 +529,6 @@ impl LlamaModel {
         Ok(template.to_owned())
     }
 
-    /// Loads a model from a file.
-    ///
-    /// # Errors
-    ///
-    /// See [`LlamaModelLoadError`] for more information.
-    #[tracing::instrument(skip_all, fields(params))]
-    pub fn load_from_file(
-        path: impl AsRef<Path>,
-        params: &LlamaModelParams,
-    ) -> Result<Self, LlamaModelLoadError> {
-        backend();
-        let path = path.as_ref();
-        debug_assert!(Path::new(path).exists(), "{path:?} does not exist");
-        let path = path
-            .to_str()
-            .ok_or(LlamaModelLoadError::PathToStrError(path.to_path_buf()))?;
-
-        let cstr = CString::new(path)?;
-        let llama_model =
-            unsafe { llama_cpp_sys_2::llama_load_model_from_file(cstr.as_ptr(), params.params) };
-
-        let model = NonNull::new(llama_model).ok_or(LlamaModelLoadError::NullResult)?;
-
-        tracing::debug!(?path, "Loaded model");
-        Ok(LlamaModel {
-            model: Arc::new(Mutex::new(model)),
-        })
-    }
-
     /// Initializes a lora adapter from a file.
     ///
     /// # Errors
@@ -510,33 +561,6 @@ impl LlamaModel {
         Ok(LlamaLoraAdapter {
             lora_adapter: adapter,
         })
-    }
-
-    /// Create a new context from this model.
-    ///
-    /// # Errors
-    ///
-    /// There is many ways this can fail. See [`LlamaContextLoadError`] for more information.
-    // we intentionally do not derive Copy on `LlamaContextParams` to allow llama.cpp to change the type to be non-trivially copyable.
-    #[allow(clippy::needless_pass_by_value)]
-    pub fn new_context(
-        &self,
-        params: LlamaContextParams,
-    ) -> Result<LlamaContext, LlamaContextLoadError> {
-        let context_params = params.context_params;
-        let context = unsafe {
-            llama_cpp_sys_2::llama_new_context_with_model(
-                self.model.lock().unwrap().as_ptr(),
-                context_params,
-            )
-        };
-        let context = NonNull::new(context).ok_or(LlamaContextLoadError::NullReturn)?;
-
-        Ok(LlamaContext::new(
-            self.clone(),
-            context,
-            params.embeddings(),
-        ))
     }
 
     /// Apply the models chat template to some messages.
@@ -596,9 +620,8 @@ impl LlamaModel {
     }
 }
 
-impl Drop for LlamaModel {
+impl Drop for ModelInner {
     fn drop(&mut self) {
-        println!("free LlamaModel");
         unsafe { llama_cpp_sys_2::llama_free_model(self.model.lock().unwrap().as_ptr()) }
     }
 }
