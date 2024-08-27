@@ -181,10 +181,10 @@ fn main() -> Result<()> {
         ctx_params = ctx_params.with_n_threads_batch(threads_batch);
     }
 
-    let mut ctx = model
-        .new_context(ctx_params)
-        .with_context(|| "unable to create the llama_context")?;
     for _ in 0..10 {
+        let mut ctx = model
+            .new_context(ctx_params.clone())
+            .with_context(|| "unable to create the llama_context")?;
         let out = ctx.forward(prompt.clone(), n_len)?;
         println!("{out}");
     }
