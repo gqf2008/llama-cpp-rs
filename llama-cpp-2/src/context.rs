@@ -287,9 +287,9 @@ impl LlamaContext {
     pub fn forward<S: AsRef<str>>(&mut self, prompt: S, max_length: i32) -> anyhow::Result<String> {
         //TODO 解码系统提示语，复制到并行kv_cache中
         // self.copy_kv_cache_seq(0, 1, None, None);
-        let now = Instant::now();
+
         let tokens_list = self.model.str_to_token(prompt.as_ref(), AddBos::Always)?;
-        println!("str_to_token {:?}", now.elapsed());
+
         let n_cxt = self.n_ctx() as i32;
         let n_kv_req = tokens_list.len() as i32 + (max_length - tokens_list.len() as i32);
         log::debug!("max_length = {max_length}, n_ctx = {n_cxt}, k_kv_req = {n_kv_req}");
@@ -308,9 +308,9 @@ impl LlamaContext {
             let is_last = i == last_index;
             batch.add(token, i, &[0], is_last)?;
         }
-        let now = Instant::now();
+
         self.decode(&mut batch)?;
-        println!("decode {:?}", now.elapsed());
+
         let mut n_cur = batch.n_tokens();
         let mut n_decode = 0;
         let t_main_start = crate::ggml_time_us();
@@ -333,9 +333,9 @@ impl LlamaContext {
                 batch.add(new_token_id, n_cur, &[0], true)?;
             }
             n_cur += 1;
-            let now = Instant::now();
+
             self.decode(&mut batch)?;
-            println!("decode {:?}", now.elapsed());
+
             n_decode += 1;
         }
         log::debug!("{output}");
