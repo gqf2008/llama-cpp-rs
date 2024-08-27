@@ -173,7 +173,6 @@ fn main() -> Result<()> {
     // initialize the context
     let mut ctx_params = LlamaContextParams::default()
         .with_n_ctx(ctx_size.or(Some(NonZeroU32::new(4096).unwrap())))
-        .with_n_batch(512)
         .with_seed(seed.unwrap_or(1234));
     if let Some(threads) = threads {
         ctx_params = ctx_params.with_n_threads(threads);
