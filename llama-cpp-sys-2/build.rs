@@ -91,11 +91,9 @@ fn compile_bindings(
     llama_header_path: &Path,
 ) -> Result<(), Box<dyn std::error::Error + 'static>> {
     println!("Generating bindings..");
-    
-    let includes = [
-        llama_header_path.join("ggml").join("include"),
-    ];
-    
+
+    let includes = [llama_header_path.join("ggml").join("include")];
+
     let bindings = bindgen::Builder::default()
         .clang_args(includes.map(|path| format!("-I{}", path.to_string_lossy())))
         .header(
@@ -426,7 +424,14 @@ fn compile_cuda(cx: &mut Build, cxx: &mut Build, featless_cxx: Build) -> &'stati
     // }
 
     for lib in [
-        "cuda", "cublas", "culibos", "cudart", "cublasLt", "pthread", "dl", "rt",
+        "cuda",
+        "cublas_static",
+        "culibos",
+        "cudart_static",
+        "cublasLt_static",
+        "pthread",
+        "dl",
+        "rt",
     ] {
         println!("cargo:rustc-link-lib={}", lib);
     }
@@ -623,31 +628,44 @@ fn gen_vulkan_shaders(out_path: impl AsRef<Path>) -> (impl AsRef<Path>, impl AsR
         .cpp(true)
         .get_compiler();
 
-    assert!(!cxx.is_like_msvc(), "Compiling Vulkan GGML with MSVC is not supported at this time.");
+    assert!(
+        !cxx.is_like_msvc(),
+        "Compiling Vulkan GGML with MSVC is not supported at this time."
+    );
 
     let vulkan_shaders_gen_bin = out_path.as_ref().join("vulkan-shaders-gen");
 
     cxx.to_command()
         .args([
-            vulkan_shaders_src.join("vulkan-shaders-gen.cpp").as_os_str(),
-            "-o".as_ref(), vulkan_shaders_gen_bin.as_os_str()
+            vulkan_shaders_src
+                .join("vulkan-shaders-gen.cpp")
+                .as_os_str(),
+            "-o".as_ref(),
+            vulkan_shaders_gen_bin.as_os_str(),
         ])
-        .output().expect("Could not compile Vulkan shader generator");
+        .output()
+        .expect("Could not compile Vulkan shader generator");
 
     let header = out_path.as_ref().join("ggml-vulkan-shaders.hpp");
     let source = out_path.as_ref().join("ggml-vulkan-shaders.cpp");
 
     Command::new(vulkan_shaders_gen_bin)
         .args([
-            "--glslc".as_ref(), "glslc".as_ref(),
-            "--input-dir".as_ref(), vulkan_shaders_src.as_os_str(),
-            "--output-dir".as_ref(), out_path.as_ref().join("vulkan-shaders.spv").as_os_str(),
-            "--target-hpp".as_ref(), header.as_os_str(),
-            "--target-cpp".as_ref(), source.as_os_str(),
-            "--no-clean".as_ref()
+            "--glslc".as_ref(),
+            "glslc".as_ref(),
+            "--input-dir".as_ref(),
+            vulkan_shaders_src.as_os_str(),
+            "--output-dir".as_ref(),
+            out_path.as_ref().join("vulkan-shaders.spv").as_os_str(),
+            "--target-hpp".as_ref(),
+            header.as_os_str(),
+            "--target-cpp".as_ref(),
+            source.as_os_str(),
+            "--no-clean".as_ref(),
         ])
-        .output().expect("Could not run Vulkan shader generator");
-    
+        .output()
+        .expect("Could not run Vulkan shader generator");
+
     (out_path, source)
 }
 
