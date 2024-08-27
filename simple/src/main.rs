@@ -184,8 +184,10 @@ fn main() -> Result<()> {
     let mut ctx = model
         .new_context(ctx_params)
         .with_context(|| "unable to create the llama_context")?;
+    for _ in 0..10 {
+        let out = ctx.forward(prompt.clone(), n_len)?;
+        println!("{out}");
+    }
 
-    let out = ctx.forward(prompt, n_len)?;
-    println!("{out}");
     Ok(())
 }
