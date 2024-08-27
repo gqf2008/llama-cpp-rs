@@ -180,13 +180,13 @@ fn main() -> Result<()> {
     if let Some(threads_batch) = threads_batch.or(threads) {
         ctx_params = ctx_params.with_n_threads_batch(threads_batch);
     }
-    let mut ctx = model
-        .new_context(ctx_params.clone())
-        .with_context(|| "unable to create the llama_context")?;
-    let out = ctx.forward(prompt.clone(), n_len)?;
-    println!("{out}");
+
     for _ in 0..10 {
-        let out = ctx.forward("<start_of_turn>user\n弄下昨天的数据<end_of_turn>", n_len)?;
+        let mut ctx = model
+            .new_context(ctx_params.clone())
+            .with_context(|| "unable to create the llama_context")?;
+        let out = ctx.forward(prompt.clone(), n_len)?;
+
         println!("{out}");
     }
 
