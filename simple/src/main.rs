@@ -185,8 +185,7 @@ fn main() -> Result<()> {
                 .with_context(|| "unable to create the llama_context")
                 .unwrap();
             for _ in 0..10 {
-                println!("kv_cache_count {}", ctx.get_kv_cache_token_count());
-                ctx.llama_kv_cache_seq_keep(0);
+                ctx.clear_kv_cache_seq(0, Some(2048), None);
                 let out = ctx.forward(prompt.clone(), n_len).unwrap();
 
                 println!("{out}");
