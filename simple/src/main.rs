@@ -10,21 +10,15 @@ use anyhow::{anyhow, bail, Context, Result};
 use clap::Parser;
 use hf_hub::api::sync::ApiBuilder;
 use llama_cpp_2::context::params::LlamaContextParams;
-use llama_cpp_2::ggml_time_us;
-use llama_cpp_2::llama_backend::LlamaBackend;
-use llama_cpp_2::llama_batch::LlamaBatch;
+
 use llama_cpp_2::model::params::kv_overrides::ParamOverrideValue;
 use llama_cpp_2::model::params::LlamaModelParams;
-use llama_cpp_2::model::{AddBos, Special};
-use llama_cpp_2::model::{LlamaModel, ModelInner};
-use llama_cpp_2::token::data_array::LlamaTokenDataArray;
+use llama_cpp_2::model::LlamaModel;
 use std::ffi::CString;
-use std::io::Write;
 use std::num::NonZeroU32;
 use std::path::PathBuf;
 use std::pin::pin;
 use std::str::FromStr;
-use std::time::Duration;
 
 #[derive(clap::Parser, Debug, Clone)]
 struct Args {
@@ -170,6 +164,7 @@ fn main() -> Result<()> {
     let model = LlamaModel::load_from_file(model_path, &model_params)
         .with_context(|| "unable to load model")?;
 
+    let mut handles = vec![];
     // initialize the context
     let mut ctx_params = LlamaContextParams::default()
         .with_n_ctx(ctx_size.or(Some(NonZeroU32::new(4096).unwrap())))
@@ -180,21 +175,27 @@ fn main() -> Result<()> {
     if let Some(threads_batch) = threads_batch.or(threads) {
         ctx_params = ctx_params.with_n_threads_batch(threads_batch);
     }
-    let mut threads = vec![];
 
     for _ in 0..10 {
+        let model = model.clone();
+        let prompt = prompt.clone();
         let handle = std::thread::spawn(move || {
             for _ in 0..10 {
                 let mut ctx = model
+                    .clone()
                     .new_context(ctx_params.clone())
-                    .with_context(|| "unable to create the llama_context")?;
-                let out = ctx.forward(prompt.clone(), n_len)?;
+                    .with_context(|| "unable to create the llama_context")
+                    .unwrap();
+                let out = ctx.forward(prompt.clone(), n_len).unwrap();
 
                 println!("{out}");
             }
         });
-        threads.push(handle);
+        handles.push(handle);
     }
-    threads.iter().for_each(|h| h.join().unwrap());
+    for h in handles {
+        h.join().unwrap();
+    }
+
     Ok(())
 }

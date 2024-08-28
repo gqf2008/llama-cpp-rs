@@ -58,7 +58,7 @@ impl From<RopeScalingType> for i32 {
 /// assert_eq!(ctx_params.seed(), 1234);
 /// assert_eq!(ctx_params.n_ctx(), NonZeroU32::new(2048));
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[allow(
     missing_docs,
     clippy::struct_excessive_bools,
