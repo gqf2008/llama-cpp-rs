@@ -180,15 +180,21 @@ fn main() -> Result<()> {
     if let Some(threads_batch) = threads_batch.or(threads) {
         ctx_params = ctx_params.with_n_threads_batch(threads_batch);
     }
+    let mut threads = vec![];
 
     for _ in 0..10 {
-        let mut ctx = model
-            .new_context(ctx_params.clone())
-            .with_context(|| "unable to create the llama_context")?;
-        let out = ctx.forward(prompt.clone(), n_len)?;
+        let handle = std::thread::spawn(move || {
+            for _ in 0..10 {
+                let mut ctx = model
+                    .new_context(ctx_params.clone())
+                    .with_context(|| "unable to create the llama_context")?;
+                let out = ctx.forward(prompt.clone(), n_len)?;
 
-        println!("{out}");
+                println!("{out}");
+            }
+        });
+        threads.push(handle);
     }
-
+    threads.iter().for_each(|h| h.join().unwrap());
     Ok(())
 }
