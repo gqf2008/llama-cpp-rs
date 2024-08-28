@@ -180,12 +180,11 @@ fn main() -> Result<()> {
         let model = model.clone();
         let prompt = prompt.clone();
         let handle = std::thread::spawn(move || {
+            let mut ctx = model
+                .new_context(ctx_params.clone())
+                .with_context(|| "unable to create the llama_context")
+                .unwrap();
             for _ in 0..10 {
-                let mut ctx = model
-                    .clone()
-                    .new_context(ctx_params.clone())
-                    .with_context(|| "unable to create the llama_context")
-                    .unwrap();
                 let out = ctx.forward(prompt.clone(), n_len).unwrap();
 
                 println!("{out}");
