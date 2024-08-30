@@ -176,7 +176,7 @@ fn main() -> Result<()> {
         ctx_params = ctx_params.with_n_threads_batch(threads_batch);
     }
 
-    for _ in 0..10 {
+    for _ in 0..5 {
         let model = model.clone();
         let prompt = prompt.clone();
         let handle = std::thread::spawn(move || {
